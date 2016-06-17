@@ -1,0 +1,3 @@
+create database remote:localhost/antani root root plocal
+insert into V set name = 'antani'
+select from v
