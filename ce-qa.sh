@@ -25,6 +25,8 @@ consoleTestNames=($(ls -d */))
 echo $consoleTestNames
 cd ..
 
+
+
 #copy and unzip the file
 rm -rf test_ce
 mkdir test_ce
@@ -34,6 +36,48 @@ cd test_ce
 tar -xvf $gzFile
 cd $distName
 cd bin
+
+
+### TEST SHUTDOWN
+./server.sh > ../../server.log &
+sleep 10
+shutdownOutput=$(jps | grep OServerMain)
+if [ ${#shutdownOutput} -lt "11" ]
+then
+    echo "FAIL on startup - step 1"
+    exit 1;
+fi
+./shutdown.sh
+sleep 10
+shutdownOutput=$(jps | grep OServerMain)
+echo ""
+echo "JPS: ${shutdownOutput}"
+if [ ${#shutdownOutput} -gt "2" ]
+then
+    echo "FAIL on shutdown - step 2"
+    exit 1;
+fi
+
+### TEST SHUTDOWN WITH CREDENTIALS
+
+./server.sh > ../../server.log &
+sleep 10
+./shutdown.sh -u root -p root
+sleep 10
+shutdownOutput=$(jps | grep OServerMain)
+echo ""
+echo "JPS: ${shutdownOutput}"
+if [ ${#shutdownOutput} -gt "2" ]
+then
+    echo "FAIL on shutdown - step 3"
+    exit 1;
+fi
+
+
+
+### TODO DOWNLOAD TOLKIEN-ARDA FROM THE CLOUD
+
+### TEST CONSOLE SCRIPTS
 ./server.sh > ../../server.log &
 sleep 10
 
@@ -57,5 +101,5 @@ done
 
 ./shutdown.sh
 
-echo "______ OK! ____________"
+echo "********* SUCCESS ************"
 exit 0
