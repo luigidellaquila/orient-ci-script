@@ -1,0 +1,21 @@
+<OUT-COMM-1>
+
+Creating database [remote:localhost/antani] using the storage type [plocal]...
+Connecting to database [remote:localhost/antani] with user 'admin'...OK
+Database created successfully.
+
+Current database is: remote:localhost/antani
+
+<OUT-COMM-2>
+
+Inserted record 'V#9:0{name:antani} v1' in 0,008000 sec(s).
+
+<OUT-COMM-3>
+
++----+----+------+------+
+|#   |@RID|@CLASS|name  |
++----+----+------+------+
+|0   |#9:0|V     |antani|
++----+----+------+------+
+
+1 item(s) found. Query executed in 0.003 sec(s).

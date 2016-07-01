@@ -1,31 +1,37 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright (c) OrientDB LTD (http://www.orientdb.com)
 #
 
 export ORIENTDB_ROOT_PASSWORD="root"
+export SLEEP_TIME=3
 
 # resolve links - $0 may be a softlink
 gzFile=$1
 
 # extract dist name
+old_IFS=$IFS      # save the field separator           
 IFS='/' read -r -a items <<< "$gzFile"
-distName=""
+distributionName=""
 for element in "${items[@]}"
   do
-  distName=$element
+  distributionName=$element
 done
+IFS=$old_IFS     # restore default field separator 
 
-distNameLength="${#distName}"-7
+distNameLength="${#distributionName}"-7
 
-distName=${distName:0:$distNameLength}
+distributionName=${distributionName:0:$distNameLength}
 
-cd consoletests
-consoleTestNames=($(ls -d */))
-echo $consoleTestNames
+cd console-routines
+export ROUTINES_HOME=$(pwd)
+routineTestNames=($(ls -d */))
 cd ..
 
-
+echo -e "\n\n"
+echo    "***************************************************"
+echo    "Preparing QA Test Environment"
+echo    "***************************************************"
 
 #copy and unzip the file
 rm -rf test_ce
@@ -33,14 +39,40 @@ mkdir test_ce
 #echo $gzFile
 cp $gzFile test_ce
 cd test_ce
+export TESTCE_PATH=$(pwd)
 tar -xvf $gzFile
-cd $distName
-cd bin
+rm *.tar.gz
+cd $distributionName
+export ORIENTDB_HOME=$(pwd)
+
+# Downloading Tolkien-Arda from cloud
+cd databases
+mkdir Tolkien-Arda
+cd Tolkien-Arda
+curl -O http://orientdb.com/public-databases/Tolkien-Arda.zip
+unzip Tolkien-Arda.zip
+rm Tolkien-Arda.zip
+
+echo -e "\n\n"
+echo -e "***************************************************\n"
+echo -e "INFO\n"
+echo    "Distribution:    " $distributionName
+echo    "ORIENTDB_HOME:   " $ORIENTDB_HOME
+echo    "Test Routines:   " $routineTestNames
+echo    "ROUTINES_HOME:   " $ROUTINES_HOME
+echo -e "Tests output dir:" $TESTCE_PATH "\n"
+echo -e "***************************************************"
+
+echo -e "\n\n"
+echo    "***************************************************"
+echo -e "Server Startup/Shutdown tests"
+echo    "***************************************************"
 
 
 ### TEST SHUTDOWN
+cd $ORIENTDB_HOME/bin
 ./server.sh > ../../server.log &
-sleep 10
+sleep $SLEEP_TIME
 shutdownOutput=$(jps | grep OServerMain)
 if [ ${#shutdownOutput} -lt "11" ]
 then
@@ -48,7 +80,7 @@ then
     exit 1;
 fi
 ./shutdown.sh
-sleep 10
+sleep $SLEEP_TIME
 shutdownOutput=$(jps | grep OServerMain)
 echo ""
 echo "JPS: ${shutdownOutput}"
@@ -61,9 +93,9 @@ fi
 ### TEST SHUTDOWN WITH CREDENTIALS
 
 ./server.sh > ../../server.log &
-sleep 10
+sleep $SLEEP_TIME
 ./shutdown.sh -u root -p root
-sleep 10
+sleep $SLEEP_TIME
 shutdownOutput=$(jps | grep OServerMain)
 echo ""
 echo "JPS: ${shutdownOutput}"
@@ -73,33 +105,48 @@ then
     exit 1;
 fi
 
+echo -e "\n\n"
+echo    "***************************************************"
+echo -e "Executing console-routines tests"
+echo    "***************************************************"
 
-
-### TODO DOWNLOAD TOLKIEN-ARDA FROM THE CLOUD
+old_IFS=$IFS      # save the field separator 
+IFS=$'\n'
 
 ### TEST CONSOLE SCRIPTS
 ./server.sh > ../../server.log &
-sleep 10
+sleep $SLEEP_TIME
 
 echo ""
-echo $consoleTestNames
-for i in "${consoleTestNames[@]}"
+for i in "${routineTestNames[@]}"
 do
     ilength=${#i}
     ilength=`expr ${ilength} - 1`
-    echo ""
-    echo "final length: ${ilength}"
+    routineName=${i:0:ilength}
+    echo "Executing '"$routineName"' routine"
     if [ ${ilength} -gt "1" ]
     then
-		echo "doing ${i}"
-	    i=${i:0:$ilength}
-    	echo "doing ./console.sh ../../../consoletests/$i/test.txt > ../../console_${i}_result.log"
-	    ./console.sh ../../../consoletests/$i/test.txt > ../../console_${i}_result.log
-    	cat ../../console_${i}_result.log	
+
+        # Splitting output-commands.txt
+        awk 'BEGIN {RS = "(^|\n)<OUT-COMM-[0-9]*>\n"} ; { if (NR>1) print $0 >> "'$ROUTINES_HOME/$routineName/'out-comm-"(NR-1)".txt"}' $ROUTINES_HOME/$routineName/output-commands.txt
+
+	    echo "doing ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/console_${routineName}_result.log"
+        ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/console_${routineName}_result.log
+    	
+        cat $TESTCE_PATH/console_${routineName}_result.log	
+
+        #Comparing each command output with the expected value contained in the just splitted files
+        awk
+
+        # Removing output commands chunks
+        #rm $ROUTINES_HOME/$routineName/out-comm-*
     fi
 done
 
 ./shutdown.sh
+
+IFS=$old_IFS     # restore default field separator 
+
 
 echo "********* SUCCESS ************"
 exit 0
