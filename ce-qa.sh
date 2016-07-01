@@ -71,7 +71,7 @@ echo    "***************************************************"
 
 ### TEST SHUTDOWN
 cd $ORIENTDB_HOME/bin
-./server.sh > ../../server.log &
+./server.sh > $TESTCE_PATH/server.log &
 sleep $SLEEP_TIME
 shutdownOutput=$(jps | grep OServerMain)
 if [ ${#shutdownOutput} -lt "11" ]
@@ -92,7 +92,7 @@ fi
 
 ### TEST SHUTDOWN WITH CREDENTIALS
 
-./server.sh > ../../server.log &
+./server.sh > $TESTCE_PATH/server.log &
 sleep $SLEEP_TIME
 ./shutdown.sh -u root -p root
 sleep $SLEEP_TIME
@@ -114,36 +114,48 @@ old_IFS=$IFS      # save the field separator
 IFS=$'\n'
 
 ### TEST CONSOLE SCRIPTS
-./server.sh > ../../server.log &
-sleep $SLEEP_TIME
+
 
 echo ""
 for i in "${routineTestNames[@]}"
 do
+    # start server
+    ./server.sh > $TESTCE_PATH/server.log &
+    sleep $SLEEP_TIME
+
     ilength=${#i}
     ilength=`expr ${ilength} - 1`
     routineName=${i:0:ilength}
     echo "Executing '"$routineName"' routine"
     if [ ${ilength} -gt "1" ]
     then
+        mkdir $TESTCE_PATH/${routineName}_result
 
         # Splitting output-commands.txt
-        awk 'BEGIN {RS = "(^|\n)<OUT-COMM-[0-9]*>\n"} ; { if (NR>1) print $0 >> "'$ROUTINES_HOME/$routineName/'out-comm-"(NR-1)".txt"}' $ROUTINES_HOME/$routineName/output-commands.txt
+        awk 'BEGIN {RS = "(^|\n)<OUT-COMM-[0-9]*>\n"} ; { if (NR>1) print $0 >> "'$ROUTINES_HOME/$routineName/'expected-command-output-"(NR-1)".txt"}' $ROUTINES_HOME/$routineName/output-commands.txt
 
-	    echo "doing ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/console_${routineName}_result.log"
-        ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/console_${routineName}_result.log
+	    echo "doing ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/${routineName}_result/console_${routineName}_result.log"
+        ./console.sh $ROUTINES_HOME/$routineName/input-commands.txt > $TESTCE_PATH/${routineName}_result/console_${routineName}_result.log
     	
-        cat $TESTCE_PATH/console_${routineName}_result.log	
+        cat $TESTCE_PATH/${routineName}_result/console_${routineName}_result.log	
 
-        #Comparing each command output with the expected value contained in the just splitted files
-        awk
+        # Splitting console_${routineName}_result.log into 'actual-command-output' files
+        sed -e 's/orientdb.*>.*/<OUT-COMM>/' $TESTCE_PATH/${routineName}_result/console_basic_routine_result.log |
+          awk 'BEGIN {RS = "(^|\n)<OUT-COMM>\n"} ; { if (NR>1) print $0 >> "'$TESTCE_PATH/${routineName}_result/'actual-command-ouput-"(NR-1)".txt"}'
 
-        # Removing output commands chunks
-        #rm $ROUTINES_HOME/$routineName/out-comm-*
+        #Comparing actual command outputs with the expected command outputs
+        
+        
+
+        # Removing expected and actual commands' outputs chunks
+        #rm $ROUTINES_HOME/$routineName/expected-command-output-*
+        #rm $TESTCE_PATH/${routineName}_result/actual-command-ouput-*
     fi
+
+    # shutdown server
+    ./shutdown.sh
 done
 
-./shutdown.sh
 
 IFS=$old_IFS     # restore default field separator 
 
